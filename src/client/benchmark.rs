@@ -1,4 +1,5 @@
 use std::error::Error;
+use std::time::Instant;
 use tracing_subscriber::EnvFilter;
 
 use futures::stream::StreamExt;
@@ -33,6 +34,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let _ = tracing_subscriber::fmt()
         .with_env_filter(EnvFilter::from_default_env())
         .init();
+
     // Custom network behaviour combines Kademlia and mDNS
     #[derive(NetworkBehaviour)]
     struct Behaviour {
@@ -88,8 +90,50 @@ async fn main() -> Result<(), Box<dyn Error>> {
             }
         }
 
-        Ok(Some(line)) = stdin.next_line() => {
-            handle_input_line(&mut swarm.behaviour_mut().kademlia, line);
+        Ok(Some(_line)) = stdin.next_line() => {
+            time::sleep(time::Duration::from_secs(1)).await;
+            // Benchmark configuration
+            let total_operations = 1000;
+            let mut times_put: Vec<u64> = Vec::new();
+            //let mut times_get = Vec::new();
+            for i in 0..total_operations {
+                let key = kad::RecordKey::new(&format!("key-{i}"));
+                let value = RecordValue {
+                    timestamp: i as u64,
+                    metadata: format!("Metadata {i}"),
+                    owner: "OwnerName".to_string(),
+                    source: "SourceName".to_string(),
+                    category: "CategoryName".to_string(),
+                };
+                let serialized_value = serde_json::to_vec(&value).expect("Failed to serialize value");
+                let start = Instant::now();
+                let record = kad::Record {
+                    key: key.clone(),
+                    value: serialized_value,
+                    publisher: None,
+                    expires: None,
+                };
+                swarm
+                    .behaviour_mut()
+                    .kademlia
+                    .put_record(record, kad::Quorum::One)
+                    .expect("Failed to store record locally.");
+                times_put.push(start.elapsed().as_micros() as u64);
+
+                // // Measure GET operation
+                // let start = Instant::now();
+                // swarm.behaviour_mut().kademlia.get_record(key.clone());
+                // times_get.push(start.elapsed().as_micros());
+            }
+
+            let avg_put_time: f64 = times_put.iter().sum::<u64>() as f64 / times_put.len() as f64;
+            //let avg_get_time: f64 = times_get.iter().map(|&x| x as u64).sum::<u64>() as f64 / times_get.len() as f64;
+
+            println!("Total PUT operations: {}", total_operations);
+            println!("Average PUT time: {:.2} µs", avg_put_time);
+
+            // println!("Total GET operations: {}", total_operations);
+            // println!("Average GET time: {:.2} µs", avg_get_time);
         }
         event = swarm.select_next_some() => match event {
             SwarmEvent::NewListenAddr { address, .. } => {
@@ -99,7 +143,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 for (peer_id, multiaddr) in list {
                     println!("Discovered peer: {peer_id:?} at {multiaddr}");
                     swarm.behaviour_mut().kademlia.add_address(&peer_id, multiaddr);
-
                     fetch_all_records(&mut swarm.behaviour_mut().kademlia, peer_id);
                 }
             }
@@ -117,13 +160,13 @@ async fn main() -> Result<(), Box<dyn Error>> {
                         eprintln!("Failed to get providers: {err:?}");
                     }
                     kad::QueryResult::GetRecord(Ok(kad::GetRecordOk::FoundRecord(kad::PeerRecord {
-                        record: kad::Record { key: _, value, .. },
+                        record: kad::Record { key, value, .. },
                         ..
                     }))) => {
-                        // println!("Got record with key: {:?}", str::from_utf8(key.as_ref()).unwrap());
+                        println!("Got record with key: {:?}", str::from_utf8(key.as_ref()).unwrap());
                         match serde_json::from_slice::<RecordValue>(&value) {
-                            Ok(_record_value) => {
-                                //println!("Deserialized Record: {:?}", record_value);
+                            Ok(record_value) => {
+                                println!("Deserialized Record: {:?}", record_value);
                             }
                             Err(err) => {
                                 eprintln!("Failed to deserialize record: {:?}", err);
@@ -132,12 +175,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
                     }
                     kad::QueryResult::GetRecord(Err(err)) => {
                         eprintln!("Failed to get record: {err:?}");
-                    }
-                    kad::QueryResult::PutRecord(Ok(kad::PutRecordOk { key })) => {
-                        println!(
-                            "Successfully put record {:?}",
-                            std::str::from_utf8(key.as_ref()).unwrap()
-                        );
                     }
                     kad::QueryResult::PutRecord(Err(err)) => {
                         eprintln!("Failed to put record: {err:?}");
@@ -170,84 +207,5 @@ fn fetch_all_records(kademlia: &mut kad::Behaviour<MemoryStore>, peer_id: libp2p
     for key in keys {
         println!("Requesting record with key: {:?} from: {:?}", key, peer_id);
         kademlia.get_record(key);
-    }
-}
-
-fn handle_input_line(kademlia: &mut kad::Behaviour<MemoryStore>, line: String) {
-    let mut args = line.split(' ');
-
-    match args.next() {
-        Some("GET") => {
-            let key = {
-                match args.next() {
-                    Some(key) => kad::RecordKey::new(&key),
-                    None => {
-                        eprintln!("Expected key");
-                        return;
-                    }
-                }
-            };
-            kademlia.get_record(key);
-        }
-        Some("GET_PROVIDERS") => {
-            let key = {
-                match args.next() {
-                    Some(key) => kad::RecordKey::new(&key),
-                    None => {
-                        eprintln!("Expected key");
-                        return;
-                    }
-                }
-            };
-            kademlia.get_providers(key);
-        }
-        Some("PUT") => {
-            let key = {
-                match args.next() {
-                    Some(key) => kad::RecordKey::new(&key),
-                    None => {
-                        eprintln!("Expected key");
-                        return;
-                    }
-                }
-            };
-            let value = RecordValue {
-                timestamp: 1622505600, // Example timestamp
-                metadata: "Example metadata".to_string(),
-                owner: "OwnerName".to_string(),
-                source: "SourceName".to_string(),
-                category: "CategoryName".to_string(),
-            };
-
-            let serialized_value = serde_json::to_vec(&value).expect("Failed to serialize value");
-
-            let record = kad::Record {
-                key,
-                value: serialized_value,
-                publisher: None,
-                expires: None,
-            };
-            kademlia
-                .put_record(record, kad::Quorum::One)
-                .expect("Failed to store record locally.");
-        }
-        Some("PUT_PROVIDER") => {
-            let key = {
-                match args.next() {
-                    Some(key) => kad::RecordKey::new(&key),
-                    None => {
-                        eprintln!("Expected key");
-                        return;
-                    }
-                }
-            };
-
-            kademlia
-                .start_providing(key)
-                .expect("Failed to start providing key");
-        }
-        _ => {
-            eprintln!("expected GET, GET_PROVIDERS, PUT or PUT_PROVIDER");
-        }
     }
 }

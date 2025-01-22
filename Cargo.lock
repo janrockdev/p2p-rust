@@ -3255,6 +3255,8 @@ dependencies = [
  "futures",
  "libp2p",
  "libp2p-episub",
+ "serde",
+ "serde_json",
  "tokio",
  "tracing-subscriber",
 ]
