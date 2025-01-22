@@ -1,0 +1,11 @@
+[package]
+name = "p2p-rust"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tokio = { version = "1.43.0", features = ["full", "rt-multi-thread", "macros"] }
+futures = "0.3.31"
+tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
+libp2p = { version = "0.55.0", features = ["full"] }
+libp2p-episub = "0.1.13"
