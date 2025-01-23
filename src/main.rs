@@ -54,7 +54,7 @@ async fn save_cache_periodically(cache: SharedCache, file_path: String) {
         if let Err(e) = write_cache_to_arrow(Arc::clone(&cache), &file_path).await {
             error!("Failed to save cache to Arrow file: {}", e);
         } else {
-            info!("Cache saved to Arrow file: {}", file_path);
+            debug!("Cache saved to Arrow file: {}", file_path);
         }
 
         // Sleep for 10 seconds before saving again
@@ -70,7 +70,7 @@ async fn discovery_service(peers: PeerList) {
     socket.bind(&"0.0.0.0:9000".parse::<std::net::SocketAddr>().unwrap().into()).unwrap();
 
     let socket = UdpSocket::from_std(socket.into()).unwrap();
-    info!("Discovery service listening on UDP port {}", DISCOVERY_PORT);
+    debug!("Discovery service listening on UDP port {}", DISCOVERY_PORT);
 
     let mut buf = [0u8; 1024];
     loop {
@@ -117,7 +117,7 @@ async fn check_for_expired_peers(peers: PeerList) {
 //     }
 // }
 
-async fn announce_self(peers: PeerList, node_port: u16) {
+async fn announce_self(node_port: u16) { //peers: PeerList,
     let socket = UdpSocket::bind(("0.0.0.0", 0)).await.unwrap();
     socket.set_broadcast(true).unwrap();
 
@@ -125,15 +125,15 @@ async fn announce_self(peers: PeerList, node_port: u16) {
 
     loop {
         let message = format!("ANNOUNCE 127.0.0.1:{}", node_port);
-        info!("Broadcasting: {}", message);
+        debug!("Broadcasting: {}", message);
         if let Err(e) = socket.send_to(message.as_bytes(), broadcast_address).await {
             error!("Failed to broadcast: {}", e);
         }
 
-        {
-            let peers_snapshot = peers.lock().await;
-            trace!("Known peers: {:?}", peers_snapshot);
-        }
+        // {
+        //     let peers_snapshot = peers.lock().await;
+        //     trace!("Known peers: {:?}", peers_snapshot);
+        // }
 
         tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
     }
@@ -220,7 +220,7 @@ async fn handle_connection(mut socket: TcpStream, cache: SharedCache, peers: Pee
                 error!("Failed to send response: {}", e);
             }
         }
-        Ok(_) => warn!("Connection closed by client."),
+        Ok(_) => debug!("Connection closed by client."),
         Err(e) => error!("Failed to read from socket: {}", e),
     }
 }
@@ -274,15 +274,15 @@ async fn main() {
     tokio::spawn(discovery_service(peers_clone));
 
     // Announce this node to the network
-    let peers_clone = Arc::clone(&peers);
-    tokio::spawn(announce_self(peers_clone, node_port));
+    //let peers_clone = Arc::clone(&peers);
+    tokio::spawn(announce_self(node_port)); //peers_clone
 
     // Periodically print current peers
     let peers_clone = Arc::clone(&peers);
     tokio::spawn(async move {
         loop {
             let peers_snapshot = peers_clone.lock().await;
-            debug!("Current peers: {:?}", peers_snapshot);
+            trace!("Current peers: {:?}", peers_snapshot);
             tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
         }
     });

@@ -16,6 +16,16 @@ cargo run --bin client 127.0.0.1:8080 127.0.0.1:8081 node_8080_cache.arrow write
 cargo run --bin client 127.0.0.1:8080 127.0.0.1:8081 node_8080_cache.arrow read 1000
 ```
 
+### Socket
+```shell
+nc 127.0.0.1 8080
+# use
+GET key731 # get value for key
+SET key1001=value1001 # sen new pair
+GET_LEN # cache size
+GET_ALL # print all
+```
+
 ### Output
 ```shell
 Write Benchmark Complete: 1000 requests, Total Time: 705.879621ms, Avg Time per Request: 705.879µs
@@ -23,8 +33,8 @@ Write Benchmark Complete: 1000 requests, Total Time: 705.879621ms, Avg Time per 
 
 ### Python
 ```shell
-python3 -m venv path/to/venv
-source path/to/venv/bin/activate
+python3 -m venv venv
+source venv/bin/activate
 python3 -m pip install pyarrow
 python3 -m pip install pandas
 python3 arrow.py

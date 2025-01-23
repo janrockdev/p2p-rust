@@ -76,7 +76,7 @@ fn benchmark_write(cache: SharedCache, write_node: &str, num_requests: usize) {
     );
 }
 
-fn benchmark_read(cache: SharedCache, read_node: &str, file_path: &str, num_requests: usize) {
+fn benchmark_read(cache: SharedCache, _: &str, file_path: &str, num_requests: usize) {
     let mut total_time = Duration::ZERO;
 
     for i in 0..num_requests {
