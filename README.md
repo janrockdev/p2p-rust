@@ -20,3 +20,12 @@ cargo run --bin client 127.0.0.1:8080 127.0.0.1:8081 node_8080_cache.arrow read 
 ```shell
 Write Benchmark Complete: 1000 requests, Total Time: 705.879621ms, Avg Time per Request: 705.879µs
 ```
+
+### Python
+```shell
+python3 -m venv path/to/venv
+source path/to/venv/bin/activate
+python3 -m pip install pyarrow
+python3 -m pip install pandas
+python3 arrow.py
+```
