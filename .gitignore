@@ -1,2 +1,6 @@
 .idea/
-/target
+target/
+log/
+tmp/
+
+*.arrow
