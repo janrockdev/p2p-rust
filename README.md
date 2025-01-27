@@ -38,4 +38,5 @@ source venv/bin/activate
 python3 -m pip install pyarrow
 python3 -m pip install pandas
 python3 arrow.py
+deactivate
 ```
