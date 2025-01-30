@@ -40,3 +40,50 @@ python3 -m pip install pandas
 python3 arrow.py
 deactivate
 ```
+
+### Arrow IPC to Parquet
+```rust
+use std::fs::File;
+use std::sync::Arc;
+
+use arrow::ipc::reader::FileReader as ArrowIPCReader;
+use arrow::record_batch::RecordBatch;
+use parquet::arrow::ArrowWriter;
+use parquet::file::properties::WriterProperties;
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Step 1: Read Arrow IPC file
+    let ipc_file = File::open("data.arrow")?;
+    let mut ipc_reader = ArrowIPCReader::try_new(ipc_file)?;
+    
+    // Collect all RecordBatches from the IPC file
+    let mut record_batches = vec![];
+    while let Some(batch) = ipc_reader.next()? {
+        record_batches.push(batch);
+    }
+
+    // Ensure at least one RecordBatch is available
+    if record_batches.is_empty() {
+        return Err("No data found in the Arrow IPC file.".into());
+    }
+
+    // Combine RecordBatches into a single schema if needed
+    let schema = record_batches[0].schema();
+
+    // Step 2: Write to Parquet
+    let parquet_file = File::create("output.parquet")?;
+    let writer_properties = WriterProperties::builder().build();
+    let mut parquet_writer = ArrowWriter::try_new(parquet_file, schema, Some(writer_properties))?;
+
+    // Write each RecordBatch to the Parquet file
+    for batch in record_batches {
+        parquet_writer.write(&batch)?;
+    }
+
+    // Close the writer to flush data to disk
+    parquet_writer.close()?;
+
+    println!("Converted Arrow IPC to Parquet successfully.");
+    Ok(())
+}
+```
